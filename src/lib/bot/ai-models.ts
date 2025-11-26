@@ -267,7 +267,7 @@ export class AIModels {
   }
 
   // Treinar modelos com novos dados (aprendizado contínuo)
-  async trainModels(features: number[][], targets: number[]) {
+  async trainModels(features: number[][], targets: number[], epochs: number = 1) {
     // Implementação de aprendizado incremental
     if (features.length < 10) return;
 
