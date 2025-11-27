@@ -147,7 +147,7 @@ export default function TradingBotDashboard() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                🤖 BOT TRADER PRO
+                TradeVector.AI
               </h1>
               <p className="text-white/70">
                 Trading automatizado com IA avançada
