@@ -227,8 +227,11 @@ export default function TradingBotDashboard() {
                 <label className="text-white/80 text-sm mb-2 block">Risco Máximo (%)</label>
                 <input
                   type="number"
-                  value={config.riskPercentage}
-                  onChange={(e) => setConfig({ ...config, riskPercentage: parseFloat(e.target.value) })}
+                  value={config.riskPercentage ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setConfig({ ...config, riskPercentage: v === '' ? undefined : Number(v) });
+                  }}
                   min="0.5"
                   max="10"
                   step="0.5"

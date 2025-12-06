@@ -46,6 +46,17 @@ export class OKXClient {
       }),
     });
 
+    // Verificar content-type antes de fazer parse JSON
+    const contentType = response.headers.get('content-type');
+    
+    if (!contentType || !contentType.includes('application/json')) {
+      // Resposta não é JSON - ler como texto e logar erro
+      const textResponse = await response.text();
+      console.error(`Resposta não JSON da API OKX (status ${response.status}):`, textResponse);
+      throw new Error(`Resposta não JSON da API OKX (status ${response.status})`);
+    }
+
+    // Agora sim, fazer parse JSON com segurança
     const result = await response.json();
 
     if (!result.success) {
