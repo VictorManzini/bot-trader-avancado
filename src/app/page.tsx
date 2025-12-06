@@ -14,7 +14,7 @@ export default function TradingBotDashboard() {
     riskPercentage: 2,
     symbols: ['BTC/USDT', 'ETH/USDT'],
     timeframes: ['1m', '15m', '1h', '4h', '1d'],
-    dryRunInitialBalance: 10000, // Valor padrão
+    dryRunInitialBalance: 10000,
   });
   const [credentials, setCredentials] = useState({
     apiKey: '',
@@ -23,15 +23,57 @@ export default function TradingBotDashboard() {
   });
   const [user, setUser] = useState<any>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [availableMarkets, setAvailableMarkets] = useState<string[]>([]);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(['BTC/USDT', 'ETH/USDT']);
 
   // Verificar autenticação
   useEffect(() => {
     checkUser();
   }, []);
 
+  // Carregar mercados disponíveis ao abrir configuração
+  useEffect(() => {
+    if (showConfig && availableMarkets.length === 0) {
+      loadAvailableMarkets();
+    }
+  }, [showConfig]);
+
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUser(user);
+  };
+
+  // Carregar mercados disponíveis da OKX
+  const loadAvailableMarkets = async () => {
+    setLoadingMarkets(true);
+    try {
+      const response = await fetch('/api/okx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fetchMarkets' }),
+      });
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        setAvailableMarkets(result.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mercados:', error);
+    } finally {
+      setLoadingMarkets(false);
+    }
+  };
+
+  // Toggle seleção de símbolo
+  const toggleSymbol = (symbol: string) => {
+    setSelectedSymbols(prev => {
+      if (prev.includes(symbol)) {
+        return prev.filter(s => s !== symbol);
+      } else {
+        return [...prev, symbol];
+      }
+    });
   };
 
   // Atualizar status a cada 5 segundos
@@ -52,6 +94,11 @@ export default function TradingBotDashboard() {
       return;
     }
 
+    if (selectedSymbols.length === 0) {
+      alert('Selecione pelo menos um par de trading!');
+      return;
+    }
+
     try {
       const newBot = new TradingBot({
         userId: user.id,
@@ -59,9 +106,9 @@ export default function TradingBotDashboard() {
         mode: config.mode as any,
         strategy: config.strategy as any,
         riskPercentage: config.riskPercentage!,
-        symbols: config.symbols!,
+        symbols: selectedSymbols,
         timeframes: config.timeframes as any,
-        dryRunInitialBalance: config.dryRunInitialBalance || 10000, // Passar saldo configurado
+        dryRunInitialBalance: config.dryRunInitialBalance || 10000,
       });
 
       await newBot.start();
@@ -212,6 +259,56 @@ export default function TradingBotDashboard() {
               )}
             </div>
 
+            {/* Seleção de Pares de Trading */}
+            <div className="border-t border-white/20 pt-6 mb-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-white">📊 Pares de Trading</h3>
+                <button
+                  onClick={loadAvailableMarkets}
+                  disabled={loadingMarkets}
+                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm transition-all disabled:opacity-50"
+                >
+                  {loadingMarkets ? 'Carregando...' : 'Atualizar Lista'}
+                </button>
+              </div>
+
+              {loadingMarkets ? (
+                <div className="text-white/70 text-center py-4">Carregando mercados disponíveis...</div>
+              ) : availableMarkets.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-64 overflow-y-auto">
+                  {availableMarkets.map(symbol => (
+                    <label
+                      key={symbol}
+                      className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all ${
+                        selectedSymbols.includes(symbol)
+                          ? 'bg-gradient-to-r from-purple-500/30 to-pink-500/30 border-2 border-purple-400'
+                          : 'bg-white/10 border border-white/20 hover:bg-white/20'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSymbols.includes(symbol)}
+                        onChange={() => toggleSymbol(symbol)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-white text-sm font-medium">{symbol}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/70 text-center py-4">
+                  Clique em "Atualizar Lista" para carregar os pares disponíveis
+                </div>
+              )}
+
+              <div className="mt-4 p-3 bg-white/5 rounded-lg">
+                <p className="text-white/70 text-sm">
+                  <strong>Selecionados ({selectedSymbols.length}):</strong>{' '}
+                  {selectedSymbols.length > 0 ? selectedSymbols.join(', ') : 'Nenhum'}
+                </p>
+              </div>
+            </div>
+
             {(config.mode === 'LIVE' || config.mode === 'BOTH') && (
               <div className="border-t border-white/20 pt-6">
                 <h3 className="text-xl font-bold text-white mb-4">🔑 Credenciais OKX</h3>
@@ -246,6 +343,25 @@ export default function TradingBotDashboard() {
         {/* Status do Bot */}
         {status && (
           <>
+            {/* Card de Símbolos Ativos */}
+            <div className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-cyan-500/30">
+              <h3 className="text-xl font-bold text-white mb-3">📊 Configuração Ativa</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-white/70 text-sm mb-2">Modo de Operação</p>
+                  <p className="text-white font-bold text-lg">
+                    {status.mode === 'DRY_RUN' ? '🧪 DRY RUN (Simulação)' : status.mode === 'LIVE' ? '🔴 LIVE (Real)' : '🔄 AMBOS'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-sm mb-2">Pares Selecionados</p>
+                  <p className="text-white font-bold text-lg">
+                    {selectedSymbols.join(', ')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Cards de Status */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-lg rounded-2xl p-6 border border-green-500/30">
@@ -266,7 +382,6 @@ export default function TradingBotDashboard() {
                 <p className="text-2xl font-bold text-white">
                   ${status.balance.USDT?.toFixed(2) || '0.00'}
                 </p>
-                {/* Exibir saldo inicial DRY RUN */}
                 {status.mode !== 'LIVE' && status.dryRunInitialBalance && (
                   <p className="text-white/50 text-xs mt-1">
                     Inicial: ${status.dryRunInitialBalance.toFixed(2)}
@@ -296,7 +411,6 @@ export default function TradingBotDashboard() {
                 <p className={`text-2xl font-bold ${status.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   ${status.profitLoss.toFixed(2)}
                 </p>
-                {/* Exibir percentual de retorno */}
                 {status.mode !== 'LIVE' && status.dryRunInitialBalance && (
                   <p className="text-white/50 text-xs mt-1">
                     {((status.profitLoss / status.dryRunInitialBalance) * 100).toFixed(2)}% ROI
@@ -338,26 +452,32 @@ export default function TradingBotDashboard() {
             {/* Previsões */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
               <h2 className="text-2xl font-bold text-white mb-4">🔮 Previsões de IA</h2>
-              <div className="space-y-4">
-                {Object.entries(status.predictions).map(([symbol, timeframes]) => (
-                  <div key={symbol} className="bg-white/5 rounded-xl p-4">
-                    <h3 className="text-xl font-bold text-white mb-3">{symbol}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      {Object.entries(timeframes).map(([tf, pred]) => (
-                        <div key={tf} className="bg-white/10 rounded-lg p-3">
-                          <p className="text-white/70 text-xs mb-1">{tf}</p>
-                          <p className="text-white font-bold text-lg">
-                            ${pred.predictedPrice.toFixed(2)}
-                          </p>
-                          <p className="text-white/60 text-xs">
-                            {(pred.confidence * 100).toFixed(0)}% confiança
-                          </p>
-                        </div>
-                      ))}
+              {Object.keys(status.predictions).length > 0 ? (
+                <div className="space-y-4">
+                  {Object.entries(status.predictions).map(([symbol, timeframes]) => (
+                    <div key={symbol} className="bg-white/5 rounded-xl p-4">
+                      <h3 className="text-xl font-bold text-white mb-3">{symbol}</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {Object.entries(timeframes).map(([tf, pred]) => (
+                          <div key={tf} className="bg-white/10 rounded-lg p-3">
+                            <p className="text-white/70 text-xs mb-1">{tf}</p>
+                            <p className="text-white font-bold text-lg">
+                              ${pred.predictedPrice.toFixed(2)}
+                            </p>
+                            <p className="text-white/60 text-xs">
+                              {(pred.confidence * 100).toFixed(0)}% confiança
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-white/70 text-center py-8">
+                  Aguardando previsões... O bot está processando os dados dos mercados selecionados.
+                </div>
+              )}
             </div>
           </>
         )}
@@ -371,8 +491,9 @@ export default function TradingBotDashboard() {
               <p>2. Se DRY RUN: defina o patrimônio simulado inicial (padrão: $10,000)</p>
               <p>3. Escolha sua estratégia (Agressiva, Média ou Conservadora)</p>
               <p>4. Defina o risco máximo por operação (recomendado: 1-3%)</p>
-              <p>5. Se modo LIVE: adicione suas credenciais da OKX</p>
-              <p>6. Clique em "Iniciar Bot" e acompanhe em tempo real!</p>
+              <p>5. <strong>Selecione os pares de trading</strong> que deseja operar (clique em "Atualizar Lista")</p>
+              <p>6. Se modo LIVE: adicione suas credenciais da OKX</p>
+              <p>7. Clique em "Iniciar Bot" e acompanhe em tempo real!</p>
             </div>
           </div>
         )}
