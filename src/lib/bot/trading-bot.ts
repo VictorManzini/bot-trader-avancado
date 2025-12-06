@@ -14,6 +14,7 @@ export interface BotConfig {
   riskPercentage: number;
   symbols: string[];
   timeframes: ('1m' | '15m' | '1h' | '4h' | '1d')[];
+  dryRunInitialBalance?: number; // Novo campo para patrimônio DRY RUN
 }
 
 export interface BotStatus {
@@ -26,6 +27,7 @@ export interface BotStatus {
   profitLoss: number;
   predictions: { [symbol: string]: { [timeframe: string]: PredictionResult } };
   lastUpdate: number;
+  dryRunInitialBalance?: number; // Saldo inicial configurado
 }
 
 export class TradingBot {
@@ -52,7 +54,9 @@ export class TradingBot {
     }
 
     if (config.mode === 'DRY_RUN' || config.mode === 'BOTH') {
-      this.okxDryRun = new OKXClient(undefined, true);
+      // Passar o saldo inicial configurado para o cliente DRY RUN
+      const initialBalance = config.dryRunInitialBalance || 10000;
+      this.okxDryRun = new OKXClient(undefined, true, initialBalance);
     }
 
     // Inicializar módulos de IA e decisão
@@ -75,6 +79,11 @@ export class TradingBot {
     console.log(`🤖 Bot iniciado em modo ${this.config.mode}`);
     console.log(`📊 Estratégia: ${this.config.strategy}`);
     console.log(`💰 Risco máximo: ${this.config.riskPercentage}%`);
+    
+    if (this.config.mode === 'DRY_RUN' || this.config.mode === 'BOTH') {
+      const initialBalance = this.config.dryRunInitialBalance || 10000;
+      console.log(`💵 Patrimônio DRY RUN inicial: $${initialBalance.toFixed(2)}`);
+    }
 
     // Loop principal
     this.intervalId = setInterval(() => {
@@ -388,6 +397,7 @@ export class TradingBot {
       profitLoss: totalPL,
       predictions: this.predictions,
       lastUpdate: Date.now(),
+      dryRunInitialBalance: this.config.dryRunInitialBalance, // Incluir saldo inicial
     };
   }
 

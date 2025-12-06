@@ -17,15 +17,17 @@ export class OKXClient {
   private credentials?: OKXCredentials;
   private dryRunMode: boolean = false;
   private dryRunBalance: { [key: string]: number } = {};
+  private dryRunInitialBalance: number = 10000; // Saldo inicial padrão
 
-  constructor(credentials?: OKXCredentials, dryRun: boolean = false) {
+  constructor(credentials?: OKXCredentials, dryRun: boolean = false, initialBalance?: number) {
     this.dryRunMode = dryRun;
     this.credentials = credentials;
 
     // Inicializar saldo virtual para DRY RUN
     if (dryRun) {
+      this.dryRunInitialBalance = initialBalance || 10000;
       this.dryRunBalance = {
-        USDT: 10000, // Saldo inicial simulado
+        USDT: this.dryRunInitialBalance, // Usar saldo configurado
       };
     }
   }
@@ -132,6 +134,11 @@ export class OKXClient {
     }
 
     return await this.callAPI('fetchBalance');
+  }
+
+  // Obter saldo inicial DRY RUN
+  getDryRunInitialBalance(): number {
+    return this.dryRunInitialBalance;
   }
 
   // Verificar se está em DRY RUN

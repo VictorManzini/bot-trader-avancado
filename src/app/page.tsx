@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { TradingBot, BotConfig, BotStatus } from '@/lib/bot/trading-bot';
 import { supabase } from '@/lib/supabase';
-import { Play, Pause, Settings, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Play, Pause, Settings, TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react';
 
 export default function TradingBotDashboard() {
   const [bot, setBot] = useState<TradingBot | null>(null);
@@ -14,6 +14,7 @@ export default function TradingBotDashboard() {
     riskPercentage: 2,
     symbols: ['BTC/USDT', 'ETH/USDT'],
     timeframes: ['1m', '15m', '1h', '4h', '1d'],
+    dryRunInitialBalance: 10000, // Valor padrão
   });
   const [credentials, setCredentials] = useState({
     apiKey: '',
@@ -60,6 +61,7 @@ export default function TradingBotDashboard() {
         riskPercentage: config.riskPercentage!,
         symbols: config.symbols!,
         timeframes: config.timeframes as any,
+        dryRunInitialBalance: config.dryRunInitialBalance || 10000, // Passar saldo configurado
       });
 
       await newBot.start();
@@ -186,6 +188,28 @@ export default function TradingBotDashboard() {
                   className="w-full bg-white/20 text-white border border-white/30 rounded-xl px-4 py-3"
                 />
               </div>
+
+              {/* Campo de Patrimônio DRY RUN */}
+              {(config.mode === 'DRY_RUN' || config.mode === 'BOTH') && (
+                <div>
+                  <label className="text-white/80 text-sm mb-2 block">
+                    💵 Patrimônio DRY RUN (saldo simulado)
+                  </label>
+                  <input
+                    type="number"
+                    value={config.dryRunInitialBalance}
+                    onChange={(e) => setConfig({ ...config, dryRunInitialBalance: parseFloat(e.target.value) || 10000 })}
+                    min="100"
+                    max="1000000"
+                    step="1000"
+                    className="w-full bg-white/20 text-white border border-white/30 rounded-xl px-4 py-3"
+                    placeholder="10000"
+                  />
+                  <p className="text-white/50 text-xs mt-1">
+                    Saldo inicial para simulação (padrão: $10,000)
+                  </p>
+                </div>
+              )}
             </div>
 
             {(config.mode === 'LIVE' || config.mode === 'BOTH') && (
@@ -242,6 +266,12 @@ export default function TradingBotDashboard() {
                 <p className="text-2xl font-bold text-white">
                   ${status.balance.USDT?.toFixed(2) || '0.00'}
                 </p>
+                {/* Exibir saldo inicial DRY RUN */}
+                {status.mode !== 'LIVE' && status.dryRunInitialBalance && (
+                  <p className="text-white/50 text-xs mt-1">
+                    Inicial: ${status.dryRunInitialBalance.toFixed(2)}
+                  </p>
+                )}
               </div>
 
               <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg rounded-2xl p-6 border border-purple-500/30">
@@ -266,8 +296,44 @@ export default function TradingBotDashboard() {
                 <p className={`text-2xl font-bold ${status.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   ${status.profitLoss.toFixed(2)}
                 </p>
+                {/* Exibir percentual de retorno */}
+                {status.mode !== 'LIVE' && status.dryRunInitialBalance && (
+                  <p className="text-white/50 text-xs mt-1">
+                    {((status.profitLoss / status.dryRunInitialBalance) * 100).toFixed(2)}% ROI
+                  </p>
+                )}
               </div>
             </div>
+
+            {/* Card de Patrimônio Simulado (DRY RUN) */}
+            {status.mode !== 'LIVE' && status.dryRunInitialBalance && (
+              <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-amber-500/30">
+                <div className="flex items-center gap-3 mb-4">
+                  <DollarSign className="w-6 h-6 text-amber-400" />
+                  <h3 className="text-xl font-bold text-white">💰 Patrimônio Simulado (DRY RUN)</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Saldo Inicial</p>
+                    <p className="text-2xl font-bold text-white">
+                      ${status.dryRunInitialBalance.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Saldo Atual</p>
+                    <p className="text-2xl font-bold text-white">
+                      ${status.balance.USDT?.toFixed(2) || '0.00'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-white/70 text-sm mb-1">Variação</p>
+                    <p className={`text-2xl font-bold ${status.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {status.profitLoss >= 0 ? '+' : ''}{((status.profitLoss / status.dryRunInitialBalance) * 100).toFixed(2)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Previsões */}
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
@@ -302,10 +368,11 @@ export default function TradingBotDashboard() {
             <h2 className="text-2xl font-bold text-white mb-4">📚 Como Usar</h2>
             <div className="space-y-3 text-white/80">
               <p>1. Configure o modo de operação (DRY RUN para testar, LIVE para real)</p>
-              <p>2. Escolha sua estratégia (Agressiva, Média ou Conservadora)</p>
-              <p>3. Defina o risco máximo por operação (recomendado: 1-3%)</p>
-              <p>4. Se modo LIVE: adicione suas credenciais da OKX</p>
-              <p>5. Clique em "Iniciar Bot" e acompanhe em tempo real!</p>
+              <p>2. Se DRY RUN: defina o patrimônio simulado inicial (padrão: $10,000)</p>
+              <p>3. Escolha sua estratégia (Agressiva, Média ou Conservadora)</p>
+              <p>4. Defina o risco máximo por operação (recomendado: 1-3%)</p>
+              <p>5. Se modo LIVE: adicione suas credenciais da OKX</p>
+              <p>6. Clique em "Iniciar Bot" e acompanhe em tempo real!</p>
             </div>
           </div>
         )}
