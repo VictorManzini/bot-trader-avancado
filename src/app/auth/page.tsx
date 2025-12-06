@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User, Globe, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -15,57 +15,12 @@ export default function AuthPage() {
     email: '',
     password: '',
     username: '',
-    nome: '',
-    sobrenome: '',
-    pais: '',
   });
-
-  const validateForm = () => {
-    if (!isLogin) {
-      if (!formData.nome.trim()) {
-        setError('Nome é obrigatório');
-        return false;
-      }
-      if (!formData.sobrenome.trim()) {
-        setError('Sobrenome é obrigatório');
-        return false;
-      }
-      if (!formData.pais.trim()) {
-        setError('País é obrigatório');
-        return false;
-      }
-      if (!formData.username.trim()) {
-        setError('Username é obrigatório');
-        return false;
-      }
-      if (formData.username.length < 3) {
-        setError('Username deve ter no mínimo 3 caracteres');
-        return false;
-      }
-    }
-    
-    if (!formData.email.trim()) {
-      setError('Email é obrigatório');
-      return false;
-    }
-    
-    if (!formData.password || formData.password.length < 6) {
-      setError('Senha deve ter no mínimo 6 caracteres');
-      return false;
-    }
-    
-    return true;
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    if (!validateForm()) {
-      return;
-    }
-
     setLoading(true);
+    setError('');
 
     try {
       if (isLogin) {
@@ -85,32 +40,23 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
+          options: {
+            data: {
+              username: formData.username,
+            },
+          },
         });
 
         if (error) throw error;
 
         if (data.user) {
-          // Criar perfil do usuário na tabela profiles
-          const { error: profileError } = await supabase.from('profiles').insert({
+          // Criar perfil do usuário
+          await supabase.from('user_profiles').insert({
             id: data.user.id,
             email: formData.email,
             username: formData.username,
-            nome: formData.nome,
-            sobrenome: formData.sobrenome,
-            pais: formData.pais,
           });
 
-          if (profileError) throw profileError;
-
-          // Login automático após cadastro
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password,
-          });
-
-          if (signInError) throw signInError;
-
-          // Redirecionar para dashboard
           router.push('/');
         }
       }
@@ -137,81 +83,27 @@ export default function AuthPage() {
         {/* Formulário */}
         <form onSubmit={handleAuth} className="space-y-4">
           {!isLogin && (
-            <>
-              <div>
-                <label className="text-white/80 text-sm mb-2 block">
-                  Nome *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input
-                    type="text"
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-xl pl-12 pr-4 py-3 placeholder-white/50 focus:outline-none focus:border-purple-500"
-                    placeholder="Seu nome"
-                    required
-                  />
-                </div>
+            <div>
+              <label className="text-white/80 text-sm mb-2 block">
+                Nome de usuário
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full bg-white/20 text-white border border-white/30 rounded-xl pl-12 pr-4 py-3 placeholder-white/50 focus:outline-none focus:border-purple-500"
+                  placeholder="Seu nome de usuário"
+                  required
+                />
               </div>
-
-              <div>
-                <label className="text-white/80 text-sm mb-2 block">
-                  Sobrenome *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input
-                    type="text"
-                    value={formData.sobrenome}
-                    onChange={(e) => setFormData({ ...formData, sobrenome: e.target.value })}
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-xl pl-12 pr-4 py-3 placeholder-white/50 focus:outline-none focus:border-purple-500"
-                    placeholder="Seu sobrenome"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-white/80 text-sm mb-2 block">
-                  País *
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input
-                    type="text"
-                    value={formData.pais}
-                    onChange={(e) => setFormData({ ...formData, pais: e.target.value })}
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-xl pl-12 pr-4 py-3 placeholder-white/50 focus:outline-none focus:border-purple-500"
-                    placeholder="Brasil"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-white/80 text-sm mb-2 block">
-                  Username *
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="w-full bg-white/20 text-white border border-white/30 rounded-xl pl-12 pr-4 py-3 placeholder-white/50 focus:outline-none focus:border-purple-500"
-                    placeholder="seu_username"
-                    required
-                    minLength={3}
-                  />
-                </div>
-              </div>
-            </>
+            </div>
           )}
 
           <div>
             <label className="text-white/80 text-sm mb-2 block">
-              Email *
+              Email
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
@@ -228,7 +120,7 @@ export default function AuthPage() {
 
           <div>
             <label className="text-white/80 text-sm mb-2 block">
-              Senha *
+              Senha
             </label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />

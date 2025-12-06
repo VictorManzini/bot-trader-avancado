@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { TradingBot, BotConfig, BotStatus } from '@/lib/bot/trading-bot';
 import { supabase } from '@/lib/supabase';
-import { Play, Pause, Settings, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Play, Pause, Settings, TrendingUp, TrendingDown, Activity, User, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function TradingBotDashboard() {
+  const router = useRouter();
   const [bot, setBot] = useState<TradingBot | null>(null);
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [config, setConfig] = useState<Partial<BotConfig>>({
@@ -21,16 +23,54 @@ export default function TradingBotDashboard() {
     password: '',
   });
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  // Verificar autenticação
+  // Verificar autenticação e carregar perfil
   useEffect(() => {
     checkUser();
+
+    // Listener para mudanças de autenticação
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+        await loadProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setUser(session.user);
+      await loadProfile(session.user.id);
+    }
+  };
+
+  const loadProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!error && data) {
+      setProfile(data);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setShowProfileMenu(false);
+    router.push('/auth');
   };
 
   // Atualizar status a cada 5 segundos
@@ -89,7 +129,7 @@ export default function TradingBotDashboard() {
             Faça login para acessar o bot de trading profissional
           </p>
           <button
-            onClick={() => window.location.href = '/auth'}
+            onClick={() => router.push('/auth')}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:scale-105 transition-transform"
           >
             Fazer Login / Cadastro
@@ -113,13 +153,64 @@ export default function TradingBotDashboard() {
                 Trading automatizado com IA avançada
               </p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3">
+              {/* Ícone de Perfil */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition-all"
+                >
+                  <User className="w-5 h-5" />
+                  <span className="hidden sm:inline">
+                    {profile?.username || user.email?.split('@')[0]}
+                  </span>
+                </button>
+
+                {/* Menu Dropdown */}
+                {showProfileMenu && (
+                  <>
+                    {/* Overlay para fechar ao clicar fora */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+                    
+                    <div className="absolute right-0 mt-2 w-48 bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 shadow-2xl z-50">
+                      <div className="p-3 border-b border-white/20">
+                        <p className="text-white font-semibold text-sm">
+                          {profile?.nome} {profile?.sobrenome}
+                        </p>
+                        <p className="text-white/60 text-xs">@{profile?.username}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          // TODO: Implementar página de perfil
+                          alert('Página de perfil em desenvolvimento');
+                        }}
+                        className="w-full text-left px-4 py-3 text-white/80 hover:bg-white/10 transition-colors flex items-center gap-2"
+                      >
+                        <User className="w-4 h-4" />
+                        Perfil
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 text-red-300 hover:bg-white/10 transition-colors flex items-center gap-2 rounded-b-xl"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sair
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <button
                 onClick={() => setShowConfig(!showConfig)}
                 className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all"
               >
                 <Settings className="w-5 h-5" />
-                Configurar
+                <span className="hidden sm:inline">Configurar</span>
               </button>
               {!bot ? (
                 <button
@@ -127,7 +218,7 @@ export default function TradingBotDashboard() {
                   className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-semibold transition-all hover:scale-105"
                 >
                   <Play className="w-5 h-5" />
-                  Iniciar Bot
+                  <span className="hidden sm:inline">Iniciar Bot</span>
                 </button>
               ) : (
                 <button
@@ -135,7 +226,7 @@ export default function TradingBotDashboard() {
                   className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-semibold transition-all hover:scale-105"
                 >
                   <Pause className="w-5 h-5" />
-                  Parar Bot
+                  <span className="hidden sm:inline">Parar Bot</span>
                 </button>
               )}
             </div>
@@ -298,7 +389,7 @@ export default function TradingBotDashboard() {
 
         {/* Info */}
         {!bot && (
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mt-6">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 mt-6 relative z-0">
             <h2 className="text-2xl font-bold text-white mb-4">📚 Como Usar</h2>
             <div className="space-y-3 text-white/80">
               <p>1. Configure o modo de operação (DRY RUN para testar, LIVE para real)</p>
